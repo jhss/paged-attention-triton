@@ -72,7 +72,10 @@ def main(
                                                             kv_cache_dtype,
                                                             dtype,
                                                             device=device)
+    print("[DEBUG] key_cache shape: ", len(key_caches))
     key_cache, value_cache = key_caches[0], value_caches[0]
+    print("[DEBUG] key_cache shape: ", key_cache.shape)
+    print("[DEBUG] value_cache shape: ", value_cache.shape)
 
     # Prepare for the paged attention kernel.
     output = torch.empty_like(query)
@@ -136,6 +139,37 @@ def main(
                     kv_cache_dtype,
                     kv_scale,
                 )
+            elif version == "triton":
+                key_value_seqs = 10
+                key_cache = torch.empty(key_value_seqs,
+                                        num_query_heads,
+                                        head_size,
+                                        dtype=dtype,
+                                        device=device)
+                key_cache.uniform_(-scale, scale)
+
+                value_cache = torch.empty(key_value_seqs,
+                                          num_query_heads,
+                                          head_size,
+                                          dtype=dtype,
+                                          device=device)
+                value_cache.uniform_(-scale, scale)
+
+                ops.naive_attention_triton(
+                    output,
+                    query,
+                    key_cache,
+                    value_cache,
+                    num_kv_heads,
+                    scale,
+                    block_tables,
+                    context_lens,
+                    block_size,
+                    max_context_len,
+                    alibi_slopes,
+                    kv_cache_dtype,
+                    kv_scale,
+                )
             else:
                 raise ValueError(f"Invalid version: {version}")
         torch.cuda.synchronize()
@@ -163,7 +197,7 @@ if __name__ == '__main__':
         description="Benchmark the paged attention kernel.")
     parser.add_argument("--version",
                         type=str,
-                        choices=["v1", "v2"],
+                        choices=["v1", "v2", "triton"],
                         default="v2")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--context-len", type=int, default=4096)

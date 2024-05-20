@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import torch
 from vllm._C import cache_ops as vllm_cache_ops
 from vllm._C import ops as vllm_ops
+from vllm.triton import ops as triton_ops
 # try:
 #     from vllm._C import cache_ops as vllm_cache_ops
 #     from vllm._C import ops as vllm_ops
@@ -76,6 +77,26 @@ def paged_attention_v2(
                                 block_tables, context_lens, block_size,
                                 max_context_len, alibi_slopes, kv_cache_dtype,
                                 kv_scale)
+
+def naive_attention_triton(
+    out: torch.Tensor,
+    query: torch.Tensor,
+    key_cache: torch.Tensor,
+    value_cache: torch.Tensor,
+    num_kv_heads: int,
+    scale: float,
+    block_tables: torch.Tensor,
+    context_lens: torch.Tensor,
+    block_size: int,
+    max_context_len: int,
+    alibi_slopes: Optional[torch.Tensor],
+    kv_cache_dtype: str,
+    kv_scale: float,
+) -> None:
+    triton_ops._naive_attention_triton(out, query, key_cache, value_cache,
+                                       num_kv_heads, scale, block_tables,
+                                       context_lens, block_size, max_context_len,
+                                       alibi_slopes, kv_cache_dtype, kv_scale)
 
 
 # # pos encoding ops
